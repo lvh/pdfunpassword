@@ -1,3 +1,4 @@
 .lsp
 .clj-kondo
 pdfunpassword.edn
+.portal/vs-code.edn
