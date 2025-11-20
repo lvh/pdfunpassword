@@ -13,3 +13,19 @@ it can install qpdf).
 
 [babashka]: https://babashka.org/
 
+## Usage
+
+Process PDFs in one or more directories:
+
+```bash
+bb go ~/path/to/pdfs ~/another/dir
+```
+
+Recursively process all subdirectories:
+
+```bash
+bb go --recursive ~/path/to/pdfs
+```
+
+The tool will try each 1Password entry from your `pdfunpassword.edn` config file until one successfully decrypts the PDF.
+
