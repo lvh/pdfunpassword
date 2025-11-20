@@ -3,7 +3,8 @@
    [clojure.edn :as edn]
    [babashka.process :as p]
    [clojure.string :as str]
-   [babashka.fs :as fs]))
+   [babashka.fs :as fs]
+   [babashka.cli :as cli]))
 
 (defn load-config!
   []
@@ -47,8 +48,26 @@
           (seq remaining) (recur remaining)
           :else (throw (ex-info "Failed to remove password" {:pdf pdf})))))))
 
+(defn find-pdfs
+  [dir recursive?]
+  (let [dir (fs/expand-home dir)]
+    (if recursive?
+      ;; **/*.pdf doesn't match top-level files, so we need both patterns
+      (concat (fs/glob dir "*.pdf")
+              (fs/glob dir "**/*.pdf"))
+      (fs/glob dir "*.pdf"))))
+
 (defn -main
-  [& dirs]
-  (doseq [dir dirs
-          pdf (-> dir fs/expand-home (fs/glob "*.pdf"))]
-    (remove-password! (load-config!) pdf)))
+  [& args]
+  (let [spec {:recursive {:default false
+                          :coerce :boolean
+                          :desc "Recursively process subdirectories"}}
+        {:keys [opts args]} (cli/parse-args args {:spec spec})
+        {:keys [recursive]} opts
+        dirs args]
+    (when (empty? dirs)
+      (println "Usage: bb go [--recursive] <dir1> [dir2] ...")
+      (System/exit 1))
+    (doseq [dir dirs
+            pdf (find-pdfs dir recursive)]
+      (remove-password! (load-config!) pdf))))

@@ -4,5 +4,15 @@
   {:requires ([io.lvh.pdfunpassword :as u])
    :doc "Remove passwords from PDFs in specified directories.
 
-         Usage: bb go <dir1> [dir2] ..."
-   :task (apply u/-main *command-line-args*)}}}
+         Usage: bb go [--recursive] <dir1> [dir2] ...
+
+         Options:
+           --recursive  Recursively process subdirectories (default: false)"
+   :task (apply u/-main *command-line-args*)}
+
+  test
+  {:extra-paths ["test"]
+   :requires ([clojure.test :as t]
+              [io.lvh.pdfunpassword-test])
+   :doc "Run tests"
+   :task (t/run-tests 'io.lvh.pdfunpassword-test)}}}
