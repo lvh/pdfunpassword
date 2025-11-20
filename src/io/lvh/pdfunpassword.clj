@@ -31,22 +31,31 @@
   (let [clean (->> config-entry :filters (map filters) (apply comp))]
     (-> config-entry get-onepassword-output! clean)))
 
+(defn password-protected?
+  "Check if a PDF requires a password. Returns true if password-protected, false otherwise."
+  [pdf]
+  (let [{:keys [exit]} (p/sh {:continue true :err :string} "qpdf" "--requires-password" (str pdf))]
+    (zero? exit)))
+
 (defn remove-password!
   [config pdf]
   (let [pdf (fs/path pdf)]
-    (loop [[entry & remaining] config]
-      (println "Trying entry" entry)
-      (let [password (get-password! entry)
-            argv ["qpdf"
-                  (str "--password=" password)
-                  "--decrypt"
-                  (str pdf)
-                  "--replace-input"]
-            {:keys [exit]} (apply p/sh {:continue true :err :inherit} argv)]
-        (cond
-          (zero? exit) (println "Success!")
-          (seq remaining) (recur remaining)
-          :else (throw (ex-info "Failed to remove password" {:pdf pdf})))))))
+    (println "Processing:" (str pdf))
+    (if-not (password-protected? pdf)
+      (println "  Already passwordless, skipping")
+      (loop [[entry & remaining] config]
+        (println "  Trying entry" entry)
+        (let [password (get-password! entry)
+              argv ["qpdf"
+                    (str "--password=" password)
+                    "--decrypt"
+                    (str pdf)
+                    "--replace-input"]
+              {:keys [exit]} (apply p/sh {:continue true :err :inherit} argv)]
+          (cond
+            (zero? exit) (println "  Success!")
+            (seq remaining) (recur remaining)
+            :else (throw (ex-info "Failed to remove password" {:pdf pdf}))))))))
 
 (defn find-pdfs
   [dir recursive?]
