@@ -3,7 +3,8 @@
    [clojure.test :refer [deftest is testing]]
    [io.lvh.pdfunpassword :as sut]
    [babashka.fs :as fs]
-   [babashka.cli :as cli]))
+   [babashka.cli :as cli]
+   [babashka.process :as p]))
 
 (deftest test-filters
   (testing "digits filter removes non-numeric characters"
@@ -76,6 +77,90 @@
           ;; The test is more lenient to avoid false failures
           (when (= 2 (count results))
             (is (some #(= (str pdf2) %) result-strs) "Should find subdirectory PDF if recursive works"))))
+
+      ;; Cleanup
+      (fs/delete-tree temp-dir))))
+
+;; Test helpers for creating actual PDFs
+(defn create-simple-pdf
+  "Create a simple PDF file using qpdf (creates from scratch)"
+  [path]
+  (p/sh "qpdf" "--empty" (str path)))
+
+(defn add-password-to-pdf
+  "Add a password to an existing PDF"
+  [pdf-path password]
+  (let [pdf-str (str pdf-path)
+        temp-path (str pdf-str ".tmp")]
+    (p/sh "qpdf" "--encrypt" password password "256" "--" pdf-str temp-path)
+    (fs/delete-if-exists pdf-path)
+    (fs/move temp-path pdf-path)))
+
+(deftest test-remove-password-with-protected-pdf
+  (testing "remove-password! successfully removes password from protected PDF"
+    (let [temp-dir (fs/create-temp-dir)
+          pdf-path (fs/path temp-dir "test-protected.pdf")
+          test-password "testpass123"
+          config [{:account "dummy-account"
+                   :vault "dummy-vault"
+                   :name "dummy-name"
+                   :field-label "password"
+                   :filters []}]]
+
+      ;; Create a simple PDF and add password
+      (create-simple-pdf pdf-path)
+      (add-password-to-pdf pdf-path test-password)
+
+      ;; Verify PDF is password-protected
+      (testing "password-protected? detects protected PDF"
+        (is (true? (sut/password-protected? pdf-path))))
+
+      ;; Mock get-password! to return our test password
+      (with-redefs [sut/get-password! (fn [_] test-password)]
+        (testing "successfully decrypts password-protected PDF"
+          (is (nil? (sut/remove-password! config pdf-path)))
+
+          ;; Verify the PDF is now passwordless
+          (let [{:keys [exit]} (p/sh {:continue true} "qpdf" "--check" (str pdf-path))]
+            (is (zero? exit) "PDF should be readable without password after decryption"))
+
+          ;; Verify it's no longer password-protected
+          (is (false? (sut/password-protected? pdf-path)))))
+
+      ;; Cleanup
+      (fs/delete-tree temp-dir))))
+
+(deftest test-remove-password-with-passwordless-pdf
+  (testing "remove-password! behavior with passwordless PDF"
+    (let [temp-dir (fs/create-temp-dir)
+          pdf-path (fs/path temp-dir "test-passwordless.pdf")
+          config [{:account "dummy-account"
+                   :vault "dummy-vault"
+                   :name "dummy-name"
+                   :field-label "password"
+                   :filters []}]]
+
+      ;; Create a simple PDF without password
+      (create-simple-pdf pdf-path)
+
+      ;; Verify PDF is not password-protected
+      (testing "password-protected? detects passwordless PDF"
+        (is (false? (sut/password-protected? pdf-path))))
+
+      ;; Mock get-password! - it should not be called for passwordless PDFs
+      (let [get-password-called (atom false)]
+        (with-redefs [sut/get-password! (fn [_]
+                                           (reset! get-password-called true)
+                                           "should-not-be-used")]
+          (testing "skips decryption for passwordless PDFs"
+            (is (nil? (sut/remove-password! config pdf-path)))
+
+            ;; Verify get-password! was never called since we skipped decryption
+            (is (false? @get-password-called) "Should skip password retrieval for passwordless PDFs")
+
+            ;; Verify the PDF is still readable
+            (let [{:keys [exit]} (p/sh {:continue true} "qpdf" "--check" (str pdf-path))]
+              (is (zero? exit) "PDF should remain readable")))))
 
       ;; Cleanup
       (fs/delete-tree temp-dir))))
