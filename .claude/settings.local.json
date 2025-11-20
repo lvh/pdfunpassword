@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bb:*)",
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nAdd AGENTS.md and CLAUDE.md for AI agent guidance\n\nAGENTS.md provides comprehensive documentation about the codebase\narchitecture, configuration, and usage for AI coding agents.\nCLAUDE.md references AGENTS.md for Claude Code.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
