@@ -17,7 +17,7 @@ The codebase is a single-namespace Babashka script with the following key compon
   - Custom field labels (defaults to "password")
   - Filter chains (e.g., `:digits` filter removes non-numeric characters to handle SSN/EIN formatting differences)
 
-- **PDF processing** (`remove-password!`): Uses `qpdf` to decrypt PDFs in-place. Iterates through config entries until one succeeds, throwing an error if all fail.
+- **PDF processing** (`remove-password!`): Uses `qpdf` to decrypt PDFs in-place. First checks if the PDF requires a password using `qpdf --requires-password`. If the PDF is already passwordless, skips decryption. For password-protected PDFs, iterates through config entries until one succeeds, throwing an error if all fail.
 
 - **Main entry point** (`-main`): Processes all `*.pdf` files in specified directories (supports shell expansion via `~`). Supports recursive directory traversal via `--recursive` flag.
 
